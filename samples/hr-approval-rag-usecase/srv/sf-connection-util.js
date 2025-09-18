@@ -3,6 +3,30 @@ const { executeHttpRequest } = require('@sap-cloud-sdk/http-client');
 
 AUTHORIZATION_HEADER = cds.env.requires["SUCCESS_FACTORS_CREDENTIALS"]["AUTHORIZATION_HEADER"]
 
+// Returns the download link for the provided invoice number
+async function getDownloadlink(invoiceNumber){
+    const formattedURL = "poutil/rest/File/download/OTC/DA8012303B000031/238013029.pdf";
+    try {
+        console.log("STE-GPT-INFO getDownloadlink formattedURL"+formattedURL+" invoiceNumber="+invoiceNumber);
+        const response = await executeHttpRequest(
+            {
+                destinationName: 'poqatu'
+            }, {
+                method: 'GET',
+                url: formattedURL,
+                responseType: 'arraybuffer'
+            }
+        );
+        console.log("STE-GPT-INFO getDownloadlink status- "+response?.status);
+    } catch (e) {
+        console.error("STE-GPT-ERROR getDownloadlink"+e);
+    }
+
+    return { downloadUrl: formattedURL };
+}
+
+
+
 // Returns the user object with same structure as we get from SF API
 async function getUserInfoById(filterQuery){
     try {
@@ -186,4 +210,4 @@ function timestampToString(timestamp) {
     return formattedString;
 }
 
-module.exports = { getUserInfoById, getUserManagerId, getDirectReportsById, getEmployeeTime, getPeersVacationTimeByUserId };
+module.exports = { getDownloadlink, getUserInfoById, getUserManagerId, getDirectReportsById, getEmployeeTime, getPeersVacationTimeByUserId };
