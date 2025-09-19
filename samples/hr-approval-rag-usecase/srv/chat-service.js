@@ -232,7 +232,8 @@ Context includes:\n
 2. downloadUrl\n
 Rules:\n
 1. If invoiceNumber is empty ask the user to kindly provide the invoice number required for the download.\n
-2. When invoiceNumber is provided, respond with a Markdown link where the link text is exactly the invoiceNumber and the hyperlink points to downloadUrl.\n
+2. When invoiceNumber is provided, respond using exactly the following XML structure with no additional text or punctuation:\n
+<href>{invoiceNumber}</href>\n\n<href-value>{downloadUrl}</href-value>\n
 3. Keep the tone formal and concise.\n`;
 
 
