@@ -1,6 +1,6 @@
 const cds = require('@sap/cds');
 const { DELETE } = cds.ql;
-const sf_connection_util = require("./sf-connection-util")
+const sf_connection_util = require("./sf-connection-util2")
 const { handleMemoryBeforeRagCall, handleMemoryAfterRagCall } = require('./memory-helper');
 
 userId = cds.env.requires["SUCCESS_FACTORS_CREDENTIALS"]["USER_ID"]
