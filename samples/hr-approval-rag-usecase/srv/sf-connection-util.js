@@ -59,7 +59,8 @@ function normalizeDateToYyyymmdd(asOfDate) {
 
 async function getCustomerDataFromDatasphere(){
     try {
-        const formattedURL = "api/v1/datasphere/consumption/relational/GROUP_IT_SAP/4GV_FF_S_FI_OTCKPI_01/_4GV_FF_S_FI_OTCKPI_01";
+      //  https://stengg-sapdatasphere-ap-qas.ap11.hcs.cloud.sap/api/v1/datasphere/consumption/relational/GROUP_IT_SAP/4GV_FF_S_FI_OTCKPI_01/_4GV_FF_S_FI_OTCKPI_01?$count=true&$top=2&$skip=0
+        const formattedURL = "api/v1/datasphere/consumption/relational/GROUP_IT_SAP/4GV_FF_S_FI_OTCKPI_01/_4GV_FF_S_FI_OTCKPI_01?$count=true&$top=2&$skip=0";
         console.log("STE-GPT-INFO getCustomerDataFromDatasphere formattedURL " + formattedURL);
         const response = await executeHttpRequest(
             {
