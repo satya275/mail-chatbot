@@ -6,7 +6,8 @@ service ChatService @(requires: 'authenticated-user') {
         grant: ['READ','WRITE', 'DELETE'],
         where: 'userID = $user'
     }])                 as projection on db.Conversation;
-    entity Message      as projection on db.Message;
+    entity Message          as projection on db.Message;
+    entity MessageFeedback  as projection on db.MessageFeedback;
 
     type RagResponse_AdditionalContents {
 
