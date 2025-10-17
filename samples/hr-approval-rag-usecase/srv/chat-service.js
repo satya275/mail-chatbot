@@ -1,5 +1,5 @@
 const cds = require('@sap/cds');
-const { DELETE } = cds.ql;
+const { DELETE, SELECT } = cds.ql;
 const sf_connection_util = require("./sf-connection-util")
 const { handleMemoryBeforeRagCall, handleMemoryAfterRagCall } = require('./memory-helper');
 
@@ -527,10 +527,14 @@ module.exports = function () {
             const responseTimestamp = new Date().toISOString();
             await handleMemoryAfterRagCall (conversationId , responseTimestamp, chatRagResponse.completion, Message, Conversation);
 
+            const persistedResponseMessage = await SELECT.one.from(Message)
+                .where({ "cID_cID": conversationId, "creation_time": responseTimestamp, "role": chatRagResponse.completion.role });
+
             const response = {
                 "role" : chatRagResponse.completion.role,
                 "content" : chatRagResponse.completion.content,
                 "messageTime": responseTimestamp,
+                "messageId": persistedResponseMessage?.mID,
                 "additionalContents": chatRagResponse.additionalContents,
             };
 
