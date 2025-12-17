@@ -167,6 +167,7 @@ sap.ui.define([
                 mediaType: item.getMediaType(),
                 fileName: item.getFileName(),
                 size: item.getFileObject().size.toString(),
+                appId: "MARINE-CHATBOT" 
             };
             const settings = {
                 url: this.getBaseURL() + "/odata/v4/embedding-storage/Files",
@@ -314,6 +315,7 @@ sap.ui.define([
 
             const payload = JSON.stringify({
                 uuid: pdfFileID.toString(),
+                appId: "MARINE-CHATBOT"
             });
 
             return new Promise((resolve, reject) => {

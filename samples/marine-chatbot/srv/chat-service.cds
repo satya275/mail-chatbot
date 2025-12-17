@@ -18,7 +18,8 @@ action getConversationHistoryFromEngine(conversationId : String)
     messageId      : String,
     message_time   : Timestamp,
     user_id        : String,
-    user_query     : String
+    user_query     : String,
+    appId          : String
   ) returns RagResponse;
 
   // Kept for backward compatibility – implementation can call

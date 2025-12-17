@@ -139,6 +139,7 @@ sap.ui.define([
                 message_time: chatModel.getProperty("/message_time"),
                 user_id: chatModel.getProperty("/user_id"),
                 user_query: chatModel.getProperty("/user_query"),
+                appId: "MARINE-CHATBOT" 
             });
 
             this.sendMessage(payload)

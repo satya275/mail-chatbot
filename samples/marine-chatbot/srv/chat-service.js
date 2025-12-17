@@ -457,7 +457,7 @@ const categoryHandlers = {
         await marine_util.getCustomerDataFromDatasphere(analyticsQuery);
       console.log(
         'STE-GPT-INFO customer analytics response ' +
-          JSON.stringify(customerAnalyticsResult)
+        JSON.stringify(customerAnalyticsResult)
       );
       analyticsContext = {
         analyticsQuery,
@@ -514,7 +514,8 @@ module.exports = function () {
         messageId,
         message_time,
         user_id,
-        user_query
+        user_query,
+        appId
       } = req.data;
 
       // 1) CLASSIFICATION – REMOTE via AI Engine destination
@@ -589,23 +590,24 @@ module.exports = function () {
       }
 
       // 4) RAG via AI ENGINE (remote CAP app via destination)
-  const ragResult = await aiEngine.tx(req).send({
-  method: 'POST',
-  path: '/ragWithSdk', // exposed by AI engine CAP project
-  data: {
-    conversationId,
-    messageId,
-    message_time,
-    user_id,
-    userQuery: user_query,
-    tableName,
-    embeddingColumn,
-    contentColumn,
-    // category-specific prompt
-    prompt: promptResponses[category],
-    topK: 30
-  }
-});
+      const ragResult = await aiEngine.tx(req).send({
+        method: 'POST',
+        path: '/ragWithSdk', // exposed by AI engine CAP project
+        data: {
+          conversationId,
+          messageId,
+          message_time,
+          user_id,
+          userQuery: user_query,
+          appId: 'MARINE-CHATBOT',
+          tableName,
+          embeddingColumn,
+          contentColumn,
+          // category-specific prompt
+          prompt: promptResponses[category],
+          topK: 30
+        }
+      });
 
 
       // Normalize completion & additionalContents
@@ -677,37 +679,37 @@ module.exports = function () {
   });
 
   async function logUsageToAiEngine(req, { category, startTime, isDeterministic, conversationId, messageId, userId }) {
-  try {
-    const aiEngine = await cds.connect.to('AI_ENGINE');
-    const durationMs = Date.now() - startTime;
+    try {
+      const aiEngine = await cds.connect.to('AI_ENGINE');
+      const durationMs = Date.now() - startTime;
 
-    await aiEngine.tx(req).send({
-      method: 'POST',
-      path: '/logUsage',
-      data: {
-        sourceService: 'MARINE',
-        category,
-        isDeterministic,
-        durationMs,
-        conversationId,
-        messageId,
-        userId,
-        tenantId: req.tenant || ''
-      }
-    });
-  } catch (e) {
-    console.warn('Failed to log usage to AI engine', e);
+      await aiEngine.tx(req).send({
+        method: 'POST',
+        path: '/logUsage',
+        data: {
+          sourceService: 'MARINE',
+          category,
+          isDeterministic,
+          durationMs,
+          conversationId,
+          messageId,
+          userId,
+          tenantId: req.tenant || ''
+        }
+      });
+    } catch (e) {
+      console.warn('Failed to log usage to AI engine', e);
+    }
   }
-}
 
-this.on('getConversationHistoryFromEngine', async (req) => {
-  const aiEngine = await cds.connect.to('AI_ENGINE');
-  return aiEngine.tx(req).send({
-    method: 'POST',
-    path: '/getConversationHistory', // action on AIEngineService
-    data: { conversationId: req.data.conversationId }
+  this.on('getConversationHistoryFromEngine', async (req) => {
+    const aiEngine = await cds.connect.to('AI_ENGINE');
+    return aiEngine.tx(req).send({
+      method: 'POST',
+      path: '/getConversationHistory', // action on AIEngineService
+      data: { conversationId: req.data.conversationId }
+    });
   });
-});
 
   // ---------------------------------------------------------------------------
   // deleteChatData – delegated to AI engine (central cleanup)
