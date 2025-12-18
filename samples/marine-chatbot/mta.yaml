@@ -23,8 +23,7 @@ modules:
       - name: marine-chatbot-usecase-auth
       - name: marine-chatbot-usecase-db
       - name: marine-chatbot-usecase-destination-service
-      # NOTE: AI Core is now handled by the separate AI Engine project,
-      # so we do NOT bind default_aicore here anymore.
+      - name: marine-chatbot-usecase-connectivity
     provides:
       - name: srv-api
         properties:
@@ -201,3 +200,12 @@ resources:
       service: destination
       service-name: marine-chatbot-usecase-destination-service
       service-plan: lite
+
+  # ---------------- Connectivity Service -----------------------
+  - name: marine-chatbot-usecase-connectivity
+    # -----------------------------------------------------------
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: connectivity
+      service-plan: lite
+      service-name: marine-chatbot-usecase-connectivity

@@ -1,7 +1,6 @@
 'use strict';
 
 const cds = require('@sap/cds');
-
 const marine_util = require('./marine-util');
 
 const PROJECT_NAME = 'MARINE_USECASE';
@@ -82,100 +81,190 @@ const basePrompts = {
 };
 
 // ---------------- Formatting helpers ----------------
-function formatPurchaseOrderStatus(purchaseOrder, response) {
-  const poItems = Array.isArray(response?.poItems) ? response.poItems : [];
-  const prItems = Array.isArray(response?.prItems) ? response.prItems : [];
-  const lines = [`Purchase Order ${purchaseOrder} status:`];
+function pickFirst(obj, keys, fallback = '') {
+  for (const k of keys) {
+    const v = obj?.[k];
+    if (v !== undefined && v !== null && String(v).trim() !== '') return v;
+  }
+  return fallback;
+}
 
-  if (poItems.length) {
-    lines.push('Purchase Order Items:');
-    lines.push(
-      ...poItems.map((item) => {
-        const itemNumber = item?.ebelp || item?.['PO Item'] || '';
-        const status = item?.poStatus || item?.['PO Status'] || 'Unknown';
-        const deleted = item?.poDeleted ?? item?.['PO Deleted'];
-        const deletedText = deleted !== undefined ? String(deleted) : 'Unknown';
-        return `- Item ${itemNumber || 'N/A'}: Status ${status} (Deleted: ${deletedText})`;
-      })
-    );
+function normBoolText(v) {
+  if (v === true) return 'Yes';
+  if (v === false) return 'No';
+  if (typeof v === 'string') {
+    const s = v.trim().toLowerCase();
+    if (['true', 'x', 'yes', 'y'].includes(s)) return 'Yes';
+    if (['false', 'no', 'n'].includes(s)) return 'No';
+  }
+  if (v === '' || v == null) return 'No';
+  return String(v);
+}
+
+function joinLine(label, value) {
+  const val = value == null ? '' : String(value).trim();
+  return `${label}: ${val || 'N/A'}`;
+}
+
+function formatPoStatusNice(purchaseOrder, resp) {
+  const poItems = Array.isArray(resp?.poItems) ? resp.poItems : [];
+  const prItems = Array.isArray(resp?.prItems) ? resp.prItems : [];
+
+  const lines = [];
+  lines.push(`Purchase Order Status (PO: ${purchaseOrder})`);
+  lines.push('');
+
+  lines.push('Purchase Order Items:');
+  if (!poItems.length) {
+    lines.push('No PO items returned.');
   } else {
-    lines.push('- No purchase order line items returned.');
+    poItems.forEach((it, idx) => {
+      const poNo = pickFirst(it, ['PO Number', 'ebeln'], purchaseOrder);
+      const poItem = pickFirst(it, ['PO Item', 'ebelp']);
+      const status = pickFirst(it, ['PO Status', 'poStatus']);
+      const delInd = pickFirst(it, ['Del. Indicator', 'loekz'], '');
+      const deleted = normBoolText(pickFirst(it, ['PO Deleted', 'poDeleted'], ''));
+
+      lines.push(`${idx + 1}.`);
+      lines.push(joinLine('PO Number', poNo));
+      lines.push(joinLine('PO Item', poItem));
+      lines.push(joinLine('Status', status));
+      lines.push(joinLine('Deleted', deleted));
+      if (delInd) lines.push(joinLine('Deletion Indicator', delInd));
+
+      const prNo = pickFirst(it, ['PR Number', 'banfn'], '');
+      const prItem = pickFirst(it, ['PR Item', 'bnfpo'], '');
+      if (prNo) lines.push(joinLine('Linked PR', prItem ? `${prNo} / ${prItem}` : prNo));
+
+      lines.push('');
+    });
   }
 
-  if (prItems.length) {
-    lines.push('Related Purchase Requisitions:');
-    lines.push(
-      ...prItems.map((item) => {
-        const prNumber = item?.banfn || item?.['PR Number'] || 'N/A';
-        const prItem = item?.bnfpo || item?.['PR Item'] || 'N/A';
-        const status = item?.prStatus || item?.['PR Status'] || 'Unknown';
-        const releaseStatus = item?.['Release Status'] || item?.frgkz || '';
-        const deleted = item?.prDeleted ?? item?.['PR Deleted'];
-        const deletedText = deleted !== undefined ? String(deleted) : 'Unknown';
-        return `- PR ${prNumber} / Item ${prItem}: Status ${status} ${releaseStatus ? `(Release: ${releaseStatus})` : ''}(Deleted: ${deletedText})`;
-      })
-    );
+  lines.push('Related Purchase Requisitions:');
+  if (!prItems.length) {
+    lines.push('No related PR items returned.');
+  } else {
+    prItems.forEach((it, idx) => {
+      const prNo = pickFirst(it, ['PR Number', 'banfn']);
+      const prItem = pickFirst(it, ['PR Item', 'bnfpo']);
+      const status = pickFirst(it, ['PR Status', 'prStatus']);
+      const releaseStatus = pickFirst(it, ['Release Status'], '');
+      const releaseInd = pickFirst(it, ['Release ind.', 'frgkz'], '');
+      const deleted = normBoolText(pickFirst(it, ['PR Deleted', 'prDeleted'], ''));
+      const rejected = normBoolText(pickFirst(it, ['PR Rejected', 'prRejected'], ''));
+      const prReleaseDate = pickFirst(it, ['PR Release Date', 'prReleaseDate'], '');
+      const delInd = pickFirst(it, ['Del. Indicator', 'loekz'], '');
+
+      lines.push(`${idx + 1}.`);
+      lines.push(joinLine('PR Number', prNo));
+      lines.push(joinLine('PR Item', prItem));
+      lines.push(joinLine('Status', status));
+      if (releaseStatus) lines.push(joinLine('Release Status', releaseStatus));
+      if (releaseInd) lines.push(joinLine('Release Indicator', releaseInd));
+      if (prReleaseDate) lines.push(joinLine('Release Date', prReleaseDate));
+      lines.push(joinLine('Deleted', deleted));
+      lines.push(joinLine('Rejected', rejected));
+      if (delInd) lines.push(joinLine('Deletion Indicator', delInd));
+
+      const linkedPo = pickFirst(it, ['PO Number', 'ebeln'], '');
+      const linkedPoItem = pickFirst(it, ['PO Item', 'ebelp'], '');
+      if (linkedPo) lines.push(joinLine('Linked PO', linkedPoItem ? `${linkedPo} / ${linkedPoItem}` : linkedPo));
+
+      lines.push('');
+    });
   }
 
   return lines.join('\n');
 }
 
-function formatPurchaseRequisitionStatus(purchaseRequisition, response) {
-  const poItems = Array.isArray(response?.poItems) ? response.poItems : [];
-  const prItems = Array.isArray(response?.prItems) ? response.prItems : [];
-  const lines = [`Purchase Requisition ${purchaseRequisition} status:`];
+function formatPrStatusNice(purchaseRequisition, resp) {
+  const poItems = Array.isArray(resp?.poItems) ? resp.poItems : [];
+  const prItems = Array.isArray(resp?.prItems) ? resp.prItems : [];
 
-  if (prItems.length) {
-    lines.push('Requisition Items:');
-    lines.push(
-      ...prItems.map((item) => {
-        const prItem = item?.bnfpo || item?.['PR Item'] || 'N/A';
-        const status = item?.prStatus || item?.['PR Status'] || 'Unknown';
-        const releaseStatus = item?.['Release Status'] || item?.frgkz || '';
-        const deleted = item?.prDeleted ?? item?.['PR Deleted'];
-        const deletedText = deleted !== undefined ? String(deleted) : 'Unknown';
-        const linkedPo = item?.ebeln || item?.['PO Number'] || '';
-        return `- Item ${prItem}: Status ${status} ${releaseStatus ? `(Release: ${releaseStatus})` : ''}${linkedPo ? ` | Linked PO: ${linkedPo}` : ''} (Deleted: ${deletedText})`;
-      })
-    );
+  const lines = [];
+  lines.push(`Purchase Requisition Status (PR: ${purchaseRequisition})`);
+  lines.push('');
+
+  lines.push('Purchase Requisition Items:');
+  if (!prItems.length) {
+    lines.push('No PR items returned.');
   } else {
-    lines.push('- No purchase requisition items returned.');
+    prItems.forEach((it, idx) => {
+      const prNo = pickFirst(it, ['PR Number', 'banfn'], purchaseRequisition);
+      const prItem = pickFirst(it, ['PR Item', 'bnfpo']);
+      const status = pickFirst(it, ['PR Status', 'prStatus']);
+      const releaseStatus = pickFirst(it, ['Release Status'], '');
+      const releaseInd = pickFirst(it, ['Release ind.', 'frgkz'], '');
+      const deleted = normBoolText(pickFirst(it, ['PR Deleted', 'prDeleted'], ''));
+      const rejected = normBoolText(pickFirst(it, ['PR Rejected', 'prRejected'], ''));
+      const prReleaseDate = pickFirst(it, ['PR Release Date', 'prReleaseDate'], '');
+
+      lines.push(`${idx + 1}.`);
+      lines.push(joinLine('PR Number', prNo));
+      lines.push(joinLine('PR Item', prItem));
+      lines.push(joinLine('Status', status));
+      if (releaseStatus) lines.push(joinLine('Release Status', releaseStatus));
+      if (releaseInd) lines.push(joinLine('Release Indicator', releaseInd));
+      if (prReleaseDate) lines.push(joinLine('Release Date', prReleaseDate));
+      lines.push(joinLine('Deleted', deleted));
+      lines.push(joinLine('Rejected', rejected));
+
+      const linkedPo = pickFirst(it, ['PO Number', 'ebeln'], '');
+      const linkedPoItem = pickFirst(it, ['PO Item', 'ebelp'], '');
+      if (linkedPo) lines.push(joinLine('Linked PO', linkedPoItem ? `${linkedPo} / ${linkedPoItem}` : linkedPo));
+
+      lines.push('');
+    });
   }
 
-  if (poItems.length) {
-    lines.push('Related Purchase Orders:');
-    lines.push(
-      ...poItems.map((item) => {
-        const poNumber = item?.ebeln || item?.['PO Number'] || 'N/A';
-        const poItem = item?.ebelp || item?.['PO Item'] || 'N/A';
-        const status = item?.poStatus || item?.['PO Status'] || 'Unknown';
-        return `- PO ${poNumber} / Item ${poItem}: Status ${status}`;
-      })
-    );
+  lines.push('Related Purchase Orders:');
+  if (!poItems.length) {
+    lines.push('No related PO items returned.');
+  } else {
+    poItems.forEach((it, idx) => {
+      const poNo = pickFirst(it, ['PO Number', 'ebeln']);
+      const poItem = pickFirst(it, ['PO Item', 'ebelp']);
+      const status = pickFirst(it, ['PO Status', 'poStatus']);
+      lines.push(`${idx + 1}.`);
+      lines.push(joinLine('PO Number', poNo));
+      lines.push(joinLine('PO Item', poItem));
+      lines.push(joinLine('Status', status));
+      lines.push('');
+    });
   }
 
   return lines.join('\n');
 }
 
-function formatInvoiceStatus(purchaseOrder, response) {
-  const items = Array.isArray(response?.items) ? response.items : [];
-  const lines = [`Invoice status for Purchase Order ${purchaseOrder}:`];
+function formatInvoiceStatusNice(purchaseOrder, resp) {
+  const items = Array.isArray(resp?.items) ? resp.items : [];
+  const lines = [];
+  lines.push(`Invoice Status (PO: ${purchaseOrder})`);
+  lines.push('');
 
-  if (items.length) {
-    lines.push(
-      ...items.map((item) => {
-        const invoiceNo = item?.invoiceNo || 'N/A';
-        const value = item?.invoiceValue || 'N/A';
-        const status = item?.livStatus || 'Unknown';
-        const docDate = item?.invoiceDocDate || 'N/A';
-        const postDate = item?.invoicePostDate || 'N/A';
-        const paymentDueOn = item?.paymentDueOn || '';
-        return `- Invoice ${invoiceNo}: Value ${value}, Status ${status}, Doc Date ${docDate}, Posting Date ${postDate}${paymentDueOn ? `, Payment Due ${paymentDueOn}` : ''}`;
-      })
-    );
-  } else {
-    lines.push('- No invoice status returned.');
+  if (!items.length) {
+    lines.push('No invoice items returned.');
+    return lines.join('\n');
   }
+
+  lines.push('Invoice Items:');
+  items.forEach((it, idx) => {
+    const invoiceNo = pickFirst(it, ['invoiceNo', 'Invoice No']);
+    const value = pickFirst(it, ['invoiceValue', 'Invoice Value']);
+    const status = pickFirst(it, ['livStatus', 'LIV Status']);
+    const docDate = pickFirst(it, ['invoiceDocDate', 'Doc Date']);
+    const postDate = pickFirst(it, ['invoicePostDate', 'Posting Date']);
+    const paymentDueOn = pickFirst(it, ['paymentDueOn', 'Payment Due On'], '');
+
+    lines.push(`${idx + 1}.`);
+    lines.push(joinLine('Invoice Number', invoiceNo));
+    lines.push(joinLine('Invoice Value', value));
+    lines.push(joinLine('Status', status));
+    lines.push(joinLine('Document Date', docDate));
+    lines.push(joinLine('Posting Date', postDate));
+    if (paymentDueOn) lines.push(joinLine('Payment Due On', paymentDueOn));
+    lines.push('');
+  });
 
   return lines.join('\n');
 }
@@ -219,24 +308,29 @@ const categoryHandlers = {
     }
 
     const serviceResponse = await marine_util.getPurchaseOrderStatus(purchaseOrder);
-    const hasData = serviceResponse?.success &&
+
+    const hasData =
+      serviceResponse?.success &&
       ((Array.isArray(serviceResponse.poItems) && serviceResponse.poItems.length > 0) ||
         (Array.isArray(serviceResponse.prItems) && serviceResponse.prItems.length > 0));
 
     if (!hasData) {
+      const reason = serviceResponse?.message ? ` Reason: ${serviceResponse.message}` : '';
       return {
         deterministic: {
           role: 'assistant',
-          content: 'I cannot find status for the provided purchase order.',
+          content: `I cannot find status for the provided purchase order.${reason}`,
           additionalContents: []
         }
       };
     }
 
+    const content = formatPoStatusNice(purchaseOrder, serviceResponse);
+
     return {
       deterministic: {
         role: 'assistant',
-        content: formatPurchaseOrderStatus(purchaseOrder, serviceResponse),
+        content,
         additionalContents: []
       }
     };
@@ -258,24 +352,29 @@ const categoryHandlers = {
     }
 
     const serviceResponse = await marine_util.getInvoiceStatus(purchaseOrder);
-    const hasData = serviceResponse?.success &&
+
+    const hasData =
+      serviceResponse?.success &&
       Array.isArray(serviceResponse.items) &&
       serviceResponse.items.length > 0;
 
     if (!hasData) {
+      const reason = serviceResponse?.message ? ` Reason: ${serviceResponse.message}` : '';
       return {
         deterministic: {
           role: 'assistant',
-          content: 'I cannot find status for the provided invoice or purchase order.',
+          content: `I cannot find status for the provided invoice or purchase order.${reason}`,
           additionalContents: []
         }
       };
     }
 
+    const content = formatInvoiceStatusNice(purchaseOrder, serviceResponse);
+
     return {
       deterministic: {
         role: 'assistant',
-        content: formatInvoiceStatus(purchaseOrder, serviceResponse),
+        content,
         additionalContents: []
       }
     };
@@ -296,27 +395,30 @@ const categoryHandlers = {
       };
     }
 
-    const serviceResponse = await marine_util.getPurchaseRequisitionStatus(
-      purchaseRequisition
-    );
-    const hasData = serviceResponse?.success &&
+    const serviceResponse = await marine_util.getPurchaseRequisitionStatus(purchaseRequisition);
+
+    const hasData =
+      serviceResponse?.success &&
       ((Array.isArray(serviceResponse.prItems) && serviceResponse.prItems.length > 0) ||
         (Array.isArray(serviceResponse.poItems) && serviceResponse.poItems.length > 0));
 
     if (!hasData) {
+      const reason = serviceResponse?.message ? ` Reason: ${serviceResponse.message}` : '';
       return {
         deterministic: {
           role: 'assistant',
-          content: 'I cannot find status for the provided purchase requisition.',
+          content: `I cannot find status for the provided purchase requisition.${reason}`,
           additionalContents: []
         }
       };
     }
 
+    const content = formatPrStatusNice(purchaseRequisition, serviceResponse);
+
     return {
       deterministic: {
         role: 'assistant',
-        content: formatPurchaseRequisitionStatus(purchaseRequisition, serviceResponse),
+        content,
         additionalContents: []
       }
     };
@@ -354,9 +456,7 @@ module.exports = function () {
       });
 
       const category = classifyResult?.category;
-      const determinationJson = JSON.parse(
-        classifyResult?.determinationJson || '{}'
-      );
+      const determinationJson = JSON.parse(classifyResult?.determinationJson || '{}');
 
       console.log('AI ENGINE Classification', {
         query: user_query,
@@ -379,19 +479,14 @@ module.exports = function () {
             basePrompt: promptResponses[category]
           })) || {};
 
-        if (prompt) {
-          promptResponses[category] = prompt;
-        }
-        if (deterministic) {
-          deterministicResponse = deterministic;
-        }
+        if (prompt) promptResponses[category] = prompt;
+        if (deterministic) deterministicResponse = deterministic;
       }
 
       // 3) If deterministic → no RAG call
       if (deterministicResponse) {
         const responseTimestamp = new Date().toISOString();
 
-        // Log usage in AI engine
         await logUsageToAiEngine(req, {
           category,
           startTime,
@@ -406,16 +501,14 @@ module.exports = function () {
           content: deterministicResponse.content,
           messageTime: responseTimestamp,
           messageId: messageId || null,
-          additionalContents: JSON.stringify(
-            deterministicResponse.additionalContents || []
-          )
+          additionalContents: JSON.stringify(deterministicResponse.additionalContents || [])
         };
       }
 
       // 4) RAG via AI ENGINE (remote CAP app via destination)
       const ragResult = await aiEngine.tx(req).send({
         method: 'POST',
-        path: '/ragWithSdk', // exposed by AI engine CAP project
+        path: '/ragWithSdk',
         data: {
           conversationId,
           messageId,
@@ -426,7 +519,6 @@ module.exports = function () {
           tableName,
           embeddingColumn,
           contentColumn,
-          // category-specific prompt
           prompt: promptResponses[category],
           topK: 30
         }
@@ -438,23 +530,15 @@ module.exports = function () {
         try {
           completionObj = JSON.parse(ragResult.completion);
         } catch (e) {
-          console.warn(
-            'RAG completion is not valid JSON string, using fallback.',
-            ragResult.completion
-          );
-          completionObj = {
-            role: 'assistant',
-            content: ragResult?.completion || ''
-          };
+          console.warn('RAG completion is not valid JSON string, using fallback.', ragResult.completion);
+          completionObj = { role: 'assistant', content: ragResult?.completion || '' };
         }
       } else if (ragResult?.completion) {
         completionObj = ragResult.completion;
       } else {
         completionObj = {
           role: 'assistant',
-          content:
-            ragResult?.content ||
-            'I was unable to generate a response at this time. Please try again.'
+          content: ragResult?.content || 'I was unable to generate a response at this time. Please try again.'
         };
       }
 
@@ -463,10 +547,7 @@ module.exports = function () {
         try {
           additionalContentsArr = JSON.parse(ragResult.additionalContents);
         } catch (e) {
-          console.warn(
-            'RAG additionalContents is not valid JSON string, defaulting to [].',
-            ragResult.additionalContents
-          );
+          console.warn('RAG additionalContents is not valid JSON string, defaulting to [].', ragResult.additionalContents);
           additionalContentsArr = [];
         }
       } else {
@@ -475,7 +556,6 @@ module.exports = function () {
 
       const responseTimestamp = new Date().toISOString();
 
-      // Log usage in AI engine
       await logUsageToAiEngine(req, {
         category,
         startTime,
@@ -485,7 +565,6 @@ module.exports = function () {
         userId: user_id
       });
 
-      // Return flat, primitive-only structure for CDS/OData V4
       return {
         role: completionObj.role,
         content: completionObj.content,
@@ -495,7 +574,6 @@ module.exports = function () {
       };
     } catch (error) {
       console.error('Error while generating response for user query:', error);
-      // Let CAP convert this to a 500 for the UI
       throw error;
     }
   });
@@ -528,7 +606,7 @@ module.exports = function () {
     const aiEngine = await cds.connect.to('AI_ENGINE');
     return aiEngine.tx(req).send({
       method: 'POST',
-      path: '/getConversationHistory', // action on AIEngineService
+      path: '/getConversationHistory',
       data: { conversationId: req.data.conversationId }
     });
   });
