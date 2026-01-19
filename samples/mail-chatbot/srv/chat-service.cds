@@ -14,15 +14,15 @@ action getConversationHistoryFromEngine(conversationId : String)
 
   // Main mail extraction entrypoint used by CAP callers
   action getChatRagResponse(
-    conversationId : String?,
-    messageId      : String?,
-    message_time   : Timestamp?,
-    user_id        : String?,
-    user_query     : String?,
+    conversationId : String null,
+    messageId      : String null,
+    message_time   : Timestamp null,
+    user_id        : String null,
+    user_query     : String null,
     mail_json      : String,
-    projectId      : String?,
-    contextType    : String?,
-    expected_fields: String?,
+    projectId      : String null,
+    contextType    : String null,
+    expected_fields: String null,
     appId          : String
   ) returns RagResponse;
 
