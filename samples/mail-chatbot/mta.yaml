@@ -88,35 +88,6 @@ modules:
       no-source: true
 
   # ------------------ APPLICATION CONTENT ----------------------
-  - name: mail-chatbot-usecase-app-content
-    # -----------------------------------------------------------
-    type: com.sap.application.content
-    path: .
-    requires:
-      - name: mail-chatbot-usecase-repo-host
-        parameters:
-          content-target: true
-    build-parameters:
-      build-result: resources
-      requires:
-        - artifacts:
-            - mailchatbot.zip
-          name: mailchatbot
-          target-path: resources/
-
-  # ----------------- APPLICATION: UI5 --------------------------
-  - name: mailchatbot
-    # -----------------------------------------------------------
-    type: html5
-    path: app/mail-chatbot
-    build-parameters:
-      build-result: dist
-      builder: custom
-      commands:
-        - npm install
-        - npm run build:cf
-      supported-platforms: []
-
   # ------------------ App Router -------------------------------
   - name: mail-chatbot-usecase-approuter
     # -----------------------------------------------------------
