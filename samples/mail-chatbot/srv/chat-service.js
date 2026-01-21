@@ -26,6 +26,7 @@ module.exports = function () {
         message_time,
         user_id,
         user_query,
+        mail_subject,
         mail_json,
         projectId,
         contextType,
@@ -36,6 +37,9 @@ module.exports = function () {
       const expectedFields = mailUtil.normalizeExpectedFields(expected_fields);
       const resolvedConversationId = conversationId || uuidv4();
       const mailPayload = mailUtil.normalizeMailPayload(mail_json ?? user_query);
+      if (!mailPayload.subject && mail_subject) {
+        mailPayload.subject = mail_subject;
+      }
       const mailText = mailUtil.formatMailForQuery(mailPayload);
       const prompt = mailUtil.buildExtractionPrompt({
         projectId,
