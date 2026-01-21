@@ -4,7 +4,7 @@ const cds = require('@sap/cds');
 const mailUtil = require('./mail-util');
 const { v4: uuidv4 } = require('uuid');
 
-const DEFAULT_APP_ID = 'MAIL-CHATBOT';
+const DEFAULT_APP_ID = 'OTC';
 
 // ---- CONFIG ----
 const tableName = 'SAP_TISCE_DEMO_DOCUMENTCHUNK';
@@ -36,6 +36,8 @@ module.exports = function () {
 
       const expectedFields = mailUtil.normalizeExpectedFields(expected_fields);
       const resolvedConversationId = conversationId || uuidv4();
+      const resolvedMessageId = messageId || uuidv4();
+      const resolvedMessageTime = message_time || new Date().toISOString();
       const mailPayload = mailUtil.normalizeMailPayload(mail_json ?? user_query);
       if (!mailPayload.subject && mail_subject) {
         mailPayload.subject = mail_subject;
@@ -54,8 +56,8 @@ module.exports = function () {
         path: '/ragWithSdk',
         data: {
           conversationId: resolvedConversationId,
-          messageId,
-          message_time,
+          messageId: resolvedMessageId,
+          message_time: resolvedMessageTime,
           user_id,
           userQuery: mailText,
           appId: appId || DEFAULT_APP_ID,
@@ -74,7 +76,7 @@ module.exports = function () {
       await logUsageToAiEngine(req, {
         startTime,
         conversationId: resolvedConversationId,
-        messageId,
+        messageId: resolvedMessageId,
         userId: user_id
       });
 
@@ -82,7 +84,7 @@ module.exports = function () {
         role: completionObj.role || 'assistant',
         content: mailUtil.ensureJsonContent(completionObj.content, expectedFields),
         messageTime: responseTimestamp,
-        messageId: messageId || null,
+        messageId: resolvedMessageId,
         additionalContents: JSON.stringify(additionalContentsArr)
       };
     } catch (error) {
