@@ -2,6 +2,7 @@
 
 const cds = require('@sap/cds');
 const mailUtil = require('./mail-util');
+const { v4: uuidv4 } = require('uuid');
 
 const DEFAULT_APP_ID = 'MAIL-CHATBOT';
 
@@ -33,6 +34,7 @@ module.exports = function () {
       } = req.data;
 
       const expectedFields = mailUtil.normalizeExpectedFields(expected_fields);
+      const resolvedConversationId = conversationId || uuidv4();
       const mailPayload = mailUtil.normalizeMailPayload(mail_json ?? user_query);
       const mailText = mailUtil.formatMailForQuery(mailPayload);
       const prompt = mailUtil.buildExtractionPrompt({
@@ -47,7 +49,7 @@ module.exports = function () {
         method: 'POST',
         path: '/ragWithSdk',
         data: {
-          conversationId,
+          conversationId: resolvedConversationId,
           messageId,
           message_time,
           user_id,
@@ -67,7 +69,7 @@ module.exports = function () {
 
       await logUsageToAiEngine(req, {
         startTime,
-        conversationId,
+        conversationId: resolvedConversationId,
         messageId,
         userId: user_id
       });
