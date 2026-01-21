@@ -19,6 +19,7 @@ action getConversationHistoryFromEngine(conversationId : String)
     message_time   : Timestamp null,
     user_id        : String null,
     user_query     : String null,
+    mail_subject   : String null,
     mail_json      : String,
     projectId      : String null,
     contextType    : String null,
