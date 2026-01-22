@@ -11,6 +11,20 @@ const DEFAULT_EXPECTED_FIELDS = [
   'Timestamp'
 ];
 
+const SERVICE_CATEGORIES = ['Sundry Billing', 'Trade Billing', 'Receipts Application'];
+const SERVICE_SUBCATEGORIES = [
+  'Request for Invoices / Credit Notes',
+  'Request for Supporting Documents',
+  'Check on Invoice Status',
+  'Request for Invoice Amendment',
+  'Fiori Related Issues',
+  'Request on Reports',
+  'Request on Receipt Status',
+  'Request on Bank Account Details',
+  'Request on Statement of Accounts'
+];
+const JUNK_FLAGS = new Set(['junk', 'isJunk', 'phishing', 'isPhishing']);
+
 function normalizeExpectedFields(input) {
   if (Array.isArray(input) && input.length > 0) {
     return input.map((field) => `${field}`.trim()).filter(Boolean);
@@ -93,6 +107,8 @@ function buildExtractionPrompt({ projectId, contextType, expectedFields }) {
   const template = buildExpectedFieldTemplate(normalizedFields);
   const projectLine = projectId ? `Project ID: ${projectId}` : 'Project ID: N/A';
   const contextLine = contextType ? `Context Type: ${contextType}` : 'Context Type: N/A';
+  const categoryList = SERVICE_CATEGORIES.map((value) => `- ${value}`).join('\n');
+  const subcategoryList = SERVICE_SUBCATEGORIES.map((value) => `- ${value}`).join('\n');
 
   return `You are an AI mail-processing assistant. Extract the requested fields from the mail content provided by the user.
 ${projectLine}
@@ -103,6 +119,15 @@ Rules:
 - Use the mail subject/body, sender, recipients, and timestamp to infer values.
 - If a value is missing or not stated, return an empty string for that key.
 - Do not invent details or normalize beyond what is in the mail.
+- "Service Category" must be exactly one of the allowed values below. If it is not one of them, return an empty string.
+- "Service Subcategory" must be exactly one of the allowed values below. If it is not one of them, return an empty string.
+- If the email appears to be junk, spam, or phishing, return ONLY {"junk": true} and no other keys.
+
+Allowed Service Category values:
+${categoryList}
+
+Allowed Service Subcategory values:
+${subcategoryList}
 
 Expected fields:
 ${normalizedFields.map((field) => `- ${field}`).join('\n')}
@@ -156,7 +181,13 @@ function ensureJsonContent(content, expectedFields) {
     return JSON.stringify(template);
   }
 
-  return JSON.stringify({ ...template, ...extracted });
+  if (isJunkExtraction(extracted)) {
+    return JSON.stringify({});
+  }
+
+  const sanitized = sanitizeExtraction(extracted);
+
+  return JSON.stringify({ ...template, ...sanitized });
 }
 
 function extractJsonObject(content) {
@@ -174,6 +205,40 @@ function extractJsonObject(content) {
   if (extracted && typeof extracted === 'object') return extracted;
 
   return null;
+}
+
+function isJunkExtraction(extracted) {
+  if (!extracted || typeof extracted !== 'object') return false;
+  return Object.entries(extracted).some(([key, value]) => {
+    if (!JUNK_FLAGS.has(`${key}`.trim())) return false;
+    if (typeof value === 'boolean') return value;
+    const normalized = `${value}`.trim().toLowerCase();
+    return normalized === 'true' || normalized === 'yes';
+  });
+}
+
+function sanitizeExtraction(extracted) {
+  const sanitized = { ...extracted };
+  const category = normalizeAllowedValue(extracted?.['Service Category'], SERVICE_CATEGORIES);
+  const subcategory = normalizeAllowedValue(extracted?.['Service Subcategory'], SERVICE_SUBCATEGORIES);
+
+  if ('Service Category' in sanitized) {
+    sanitized['Service Category'] = category;
+  }
+
+  if ('Service Subcategory' in sanitized) {
+    sanitized['Service Subcategory'] = subcategory;
+  }
+
+  return sanitized;
+}
+
+function normalizeAllowedValue(value, allowedValues) {
+  if (!value) return '';
+  const normalized = `${value}`.trim().toLowerCase();
+  if (!normalized) return '';
+  const match = allowedValues.find((allowed) => allowed.toLowerCase() === normalized);
+  return match || '';
 }
 
 module.exports = {
