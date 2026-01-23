@@ -1,8 +1,8 @@
 'use strict';
 
 const DEFAULT_EXPECTED_FIELDS = [
+  'Application Type',
   'Service Category',
-  'Service Subcategory',
   'Entity Name / Business Unit',
   'Case Details',
   'From',
@@ -11,18 +11,36 @@ const DEFAULT_EXPECTED_FIELDS = [
   'Timestamp'
 ];
 
-const SERVICE_CATEGORIES = ['Sundry Billing', 'Trade Billing', 'Receipts Application'];
-const SERVICE_SUBCATEGORIES = [
-  'Request for Invoices / Credit Notes',
-  'Request for Supporting Documents',
-  'Check on Invoice Status',
-  'Request for Invoice Amendment',
-  'Fiori Related Issues',
-  'Request on Reports',
-  'Request on Receipt Status',
-  'Request on Bank Account Details',
-  'Request on Statement of Accounts'
-];
+const APPLICATION_TYPES = ['Sundry Billing', 'Trade Billing', 'Receipts Application'];
+const SERVICE_CATEGORIES_BY_TYPE = {
+  'Sundry Billing': [
+    'SB_REQINV',
+    'SB_REQDOC',
+    'SB_CHKINV',
+    'SB_REQAMD',
+    'SB_FIOQUE'
+  ],
+  'Trade Billing': [
+    'SB_REQINV',
+    'SB_REQDOC',
+    'SB_CHKINV',
+    'SB_REQAMD',
+    'SB_FIOQUE'
+  ],
+  'Receipts Application': ['RA_REQRPT', 'RA_REQREC', 'RA_REQBAN', 'RA_REQSOA']
+};
+const SERVICE_CATEGORY_DESCRIPTIONS = {
+  SB_REQINV: 'Request for Invoices / Credit Notes',
+  SB_REQDOC: 'Request for Supporting Documents',
+  SB_CHKINV: 'Check on Invoice Status',
+  SB_REQAMD: 'Request for Invoice Amendment',
+  SB_FIOQUE: 'Fiori Related Issues',
+  RA_REQRPT: 'Request on Reports',
+  RA_REQREC: 'Request on Receipt Status',
+  RA_REQBAN: 'Request on Bank Account Details',
+  RA_REQSOA: 'Request on Statement of Accounts'
+};
+const SERVICE_CATEGORIES = Object.values(SERVICE_CATEGORIES_BY_TYPE).flat();
 const JUNK_FLAGS = new Set(['junk', 'isJunk', 'phishing', 'isPhishing']);
 
 function normalizeExpectedFields(input) {
@@ -107,8 +125,11 @@ function buildExtractionPrompt({ projectId, contextType, expectedFields }) {
   const template = buildExpectedFieldTemplate(normalizedFields);
   const projectLine = projectId ? `Project ID: ${projectId}` : 'Project ID: N/A';
   const contextLine = contextType ? `Context Type: ${contextType}` : 'Context Type: N/A';
-  const categoryList = SERVICE_CATEGORIES.map((value) => `- ${value}`).join('\n');
-  const subcategoryList = SERVICE_SUBCATEGORIES.map((value) => `- ${value}`).join('\n');
+  const applicationTypeList = APPLICATION_TYPES.map((value) => `- ${value}`).join('\n');
+  const serviceCategoryList = SERVICE_CATEGORIES.map((value) => {
+    const description = SERVICE_CATEGORY_DESCRIPTIONS[value];
+    return description ? `- ${value} (${description})` : `- ${value}`;
+  }).join('\n');
 
   return `You are an AI mail-processing assistant. Extract the requested fields from the mail content provided by the user.
 ${projectLine}
@@ -119,15 +140,16 @@ Rules:
 - Use the mail subject/body, sender, recipients, and timestamp to infer values.
 - If a value is missing or not stated, return an empty string for that key.
 - Do not invent details or normalize beyond what is in the mail.
-- "Service Category" must be exactly one of the allowed values below. If it is not one of them, return an empty string.
-- "Service Subcategory" must be exactly one of the allowed values below. If it is not one of them, return an empty string.
+- "Application Type" must be exactly one of the allowed values below. If it is not one of them, return "NA".
+- "Service Category" must be exactly one of the allowed values below. If it is not one of them, return "NA".
+- For "Sundry Billing" and "Trade Billing", use SB_* service categories. For "Receipts Application", use RA_* service categories.
 - If the email appears to be junk, spam, or phishing, return ONLY {"junk": true} and no other keys.
 
-Allowed Service Category values:
-${categoryList}
+Allowed Application Type values:
+${applicationTypeList}
 
-Allowed Service Subcategory values:
-${subcategoryList}
+Allowed Service Category values:
+${serviceCategoryList}
 
 Expected fields:
 ${normalizedFields.map((field) => `- ${field}`).join('\n')}
@@ -219,15 +241,20 @@ function isJunkExtraction(extracted) {
 
 function sanitizeExtraction(extracted) {
   const sanitized = { ...extracted };
-  const category = normalizeAllowedValue(extracted?.['Service Category'], SERVICE_CATEGORIES);
-  const subcategory = normalizeAllowedValue(extracted?.['Service Subcategory'], SERVICE_SUBCATEGORIES);
+  const applicationType =
+    normalizeAllowedValue(extracted?.['Application Type'], APPLICATION_TYPES) || 'NA';
+  const legacyServiceCategory = extracted?.['Service Subcategory'];
+  const rawServiceCategory = extracted?.['Service Category'] || legacyServiceCategory;
+  const serviceCategory = normalizeAllowedValue(rawServiceCategory, SERVICE_CATEGORIES) || 'NA';
+  const validatedServiceCategory = validateServiceCategoryByType(applicationType, serviceCategory);
 
-  if ('Service Category' in sanitized) {
-    sanitized['Service Category'] = category;
+  if ('Application Type' in sanitized) {
+    sanitized['Application Type'] = applicationType;
   }
 
-  if ('Service Subcategory' in sanitized) {
-    sanitized['Service Subcategory'] = subcategory;
+  if ('Service Category' in sanitized || legacyServiceCategory !== undefined) {
+    sanitized['Service Category'] = validatedServiceCategory;
+    delete sanitized['Service Subcategory'];
   }
 
   return sanitized;
@@ -239,6 +266,13 @@ function normalizeAllowedValue(value, allowedValues) {
   if (!normalized) return '';
   const match = allowedValues.find((allowed) => allowed.toLowerCase() === normalized);
   return match || '';
+}
+
+function validateServiceCategoryByType(applicationType, serviceCategory) {
+  if (!serviceCategory) return 'NA';
+  if (!applicationType || applicationType === 'NA') return serviceCategory;
+  const allowedForType = SERVICE_CATEGORIES_BY_TYPE[applicationType] || [];
+  return allowedForType.includes(serviceCategory) ? serviceCategory : 'NA';
 }
 
 module.exports = {
