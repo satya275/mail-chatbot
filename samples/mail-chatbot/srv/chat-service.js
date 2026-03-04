@@ -26,6 +26,7 @@ module.exports = function () {
         message_time,
         user_id,
         user_query,
+        context,
         mail_subject,
         mail_json,
         projectId,
@@ -38,6 +39,7 @@ module.exports = function () {
       const resolvedConversationId = conversationId || uuidv4();
       const resolvedMessageId = messageId || uuidv4();
       const resolvedMessageTime = message_time || new Date().toISOString();
+      const resolvedContext = Array.isArray(context) ? context : [];
       const mailPayload = mailUtil.normalizeMailPayload(mail_json ?? user_query);
       if (!mailPayload.subject && mail_subject) {
         mailPayload.subject = mail_subject;
@@ -61,6 +63,7 @@ module.exports = function () {
           user_id,
           userQuery: mailText,
           appId: appId || DEFAULT_APP_ID,
+          context: resolvedContext,
           tableName,
           embeddingColumn,
           contentColumn,
