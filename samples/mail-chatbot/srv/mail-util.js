@@ -5,6 +5,7 @@ const DEFAULT_EXPECTED_FIELDS = [
   'Service Category',
   'Entity Name / Business Unit',
   'Case Details',
+  'Billing request/ CN Request number',
   'From',
   'From Mail',
   'To Mail',
@@ -138,6 +139,7 @@ ${contextLine}
 Rules:
 - Return ONLY a JSON object with the exact keys listed below.
 - Use the mail subject/body, sender, recipients, and timestamp to infer values.
+- "Billing request/ CN Request number" can be present in subject or body and may be alphanumeric (example: "CA8082512B09999"). Extract it exactly as written.
 - If a value is missing or not stated, return an empty string for that key.
 - Do not invent details or normalize beyond what is in the mail.
 - "Application Type" must be exactly one of the allowed values below. If it is not one of them, return "NA".
